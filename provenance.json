@@ -1,0 +1,29 @@
+{
+  "sources": [
+    {
+      "name": "AOP-Wiki",
+      "content": [
+        "Key Events",
+        "Key Event Relationships"
+      ],
+      "license": "CC BY-SA",
+      "accessed": "YYYY-MM-DD"
+    }
+  ],
+  "processing": {
+    "software_repository": "...",
+    "software_license": "AGPL-3.0-or-later",
+    "method": [
+      "structured extraction from KE text fields",
+      "LLM-assisted annotation",
+      "logprobe generation",
+      "statistical analysis"
+    ]
+  },
+  "outputs": [
+    "structured KE annotations",
+    "assay information",
+    "logprobe results",
+    "calculated statistics"
+  ]
+}
