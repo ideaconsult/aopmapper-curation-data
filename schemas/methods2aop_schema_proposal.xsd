@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Methods2AOP extension to AOP-Wiki XML schema
+  =============================================
+  Proposed addition to http://www.aopkb.org/aop-xml schema
+
+  Rationale
+  ~~~~~~~~~
+  The current <measurement-methodology> element is a single free-text string
+  that may describe multiple assays without structured, per-assay metadata.
+  The Methods2AOP collaboration (Karmaus et al., F1000Research 2025, 14:1375)
+  proposes structured metadata tiers per assay, linked to Key Events.
+
+  This file shows:
+  1. New simple and complex types to add at the schema level
+  2. A top-level <assays> container (a dictionary-style collection of assays, each
+     linked to its Key Event by id), usable on its own as a document root
+  3. The replacement/extension of <measurement-methodology> within <key-event>
+     (documentation-only excerpt)
+
+  Placement in the full schema
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  The new complex types (measurement-method-type, ontology-term-type) and the
+  enumerations should be declared at the top level of the schema, alongside
+  existing types such as biological-term-type.
+
+  The <measurement-methods> element replaces <measurement-methodology> (free text)
+  inside the key-event sequence. Both can coexist during transition:
+  <measurement-methodology> is kept as minOccurs="0" for backward compatibility;
+  <measurement-methods> is added as the structured alternative.
+
+  Compatibility notes
+  ~~~~~~~~~~~~~~~~~~~
+  - The free-text <measurement-methodology> field is preserved (minOccurs="0")
+    so existing XML files remain valid.
+  - <measurement-methods> is also minOccurs="0" maxOccurs="1"; it contains
+    one <method> child per distinct assay described.
+  - Each <method> carries its own Methods2AOP tier fields so metadata is
+    strictly per-assay rather than per-KE.
+  - The <ontology-term> element inside each method is deliberately separate from
+    the global biological-term-type used for KE components, because assay
+    ontology terms come from different vocabularies (BAO, CHMO, OBI) vs.
+    KEC terms (GO, PR, CHEBI, CL, UBERON).
+
+  Top-level container
+  ~~~~~~~~~~~~~~~~~~~
+  <assays> is a global element, so a document consisting only of assays is valid
+  against this file. It follows the conventions of aop.xsd: every object carries only
+  a GUID @id, and an <assay> points at its Key Event by the Key Event's AOP-Wiki GUID
+  (@ke-id), because the existing key-event element has no way to point at assays.
+  @support and @models carry consensus provenance (how many extraction models agreed,
+  and which). As in the AopWiki vendor-specific block of an AOP-Wiki export, the
+  human-readable stable ids live in a <lookup> section of the container:
+  <key-event-reference id="GUID" aop-wiki-id="123"/> maps a Key Event GUID to its
+  AOP-Wiki number, <assay-reference id="GUID" assay-id="ASSAY123"/> and
+  <technique-reference id="GUID" technique-id="TECH123"/> map an assay or
+  technique GUID to the pipeline's own ids (also used in the Solr index). GUIDs are
+  deterministic per run (uuid5) but not promised to be stable across releases; the
+  ids in the lookup are the pipeline's own handles, one per assay: assay-id is a plain
+  sequential number ASSAY<n> (like KE1234 in the AOP-Wiki), assigned once per assay and
+  never reused; it identifies the assay itself, not its technique. So assay-reference is
+  1:1 with <assay>.
+  An <assay> may also carry an optional <kec-triple> after its <method>: the
+  (object, process, action) triple extracted for that assay, each slot an
+  ontology-term-type. It is a sibling of <method>, so measurement-method-type and its
+  enumerations are unchanged.
+  Assay techniques are separate top-level objects of the container (<techniques>), like
+  the biological-process dictionary entries of aop.xsd: an <assay> references its
+  technique by GUID (@technique-id) instead of just repeating the technique name.
+  The container is declared in the same namespace as aop.xsd. If this file is merged
+  into aop.xsd, drop the guid type below (aop.xsd declares it) and decide whether
+  <assays> becomes a child of <data>.
+-->
+
+<xs:schema
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns="http://www.aopkb.org/aop-xml"
+    xmlns:a="http://www.aopkb.org/aop-xml"
+    xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning"
+    elementFormDefault="qualified"
+    vc:minVersion="1.1"
+    targetNamespace="http://www.aopkb.org/aop-xml">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       1. New simple types
+       ═══════════════════════════════════════════════════════════════════════ -->
+
+  <!-- Tier 1: method_type enumeration -->
+  <xs:simpleType name="method-type-enum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="in_vitro"/>
+      <xs:enumeration value="in_vivo"/>
+      <xs:enumeration value="in_silico"/>
+      <xs:enumeration value="ex_vivo"/>
+      <xs:enumeration value="not_specified"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Tier 3: endpoint direction -->
+  <xs:simpleType name="endpoint-direction-enum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="increase"/>
+      <xs:enumeration value="decrease"/>
+      <xs:enumeration value="change"/>
+      <xs:enumeration value="not_specified"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Tier 5: throughput -->
+  <xs:simpleType name="throughput-enum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="high"/>
+      <xs:enumeration value="medium"/>
+      <xs:enumeration value="low"/>
+      <xs:enumeration value="not_specified"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       2. New complex types
+       ═══════════════════════════════════════════════════════════════════════ -->
+
+  <!--
+    ontology-term-type
+    Carries a label + optional IRI + ontology prefix for a single controlled term.
+    Used for assay-endpoint ontology grounding (Tier 4).
+    Deliberately separate from biological-term-type (which carries source/source-id
+    and is used for KE components) because assay ontologies differ from KEC
+    ontologies.
+  -->
+  <xs:complexType name="ontology-term-type">
+    <xs:sequence>
+      <xs:element name="label"    type="xs:string"/>
+      <!-- Full IRI, e.g. http://www.bioassayontology.org/bao#BAO_0000179 -->
+      <xs:element name="iri"      type="xs:anyURI" minOccurs="0"/>
+      <!-- Ontology prefix, e.g. BAO, CHMO, OBI, GO, EFO -->
+      <xs:element name="ontology" type="xs:string"  minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!--
+    measurement-method-type
+    Structured Methods2AOP record for ONE assay.
+    A Key Event may have multiple <method> elements, one per distinct assay.
+  -->
+  <xs:complexType name="measurement-method-type">
+    <xs:sequence>
+
+      <!-- Tier 1 — Method identification -->
+      <!-- Canonical short name, e.g. "DAPI", "8OHG", "western blot" -->
+      <xs:element name="assay-name"   type="xs:string"/>
+      <!-- Free-text description of what this assay measures and how -->
+      <xs:element name="description"  type="xs:string" minOccurs="0"/>
+      <xs:element name="method-type"  type="method-type-enum" minOccurs="0"/>
+
+      <!-- Tier 2 — Biological system (per-assay; may differ within one KE) -->
+      <xs:element name="cell-types" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="cell-type" type="xs:string" minOccurs="1" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="organ-tissues" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="organ-tissue" type="xs:string" minOccurs="1" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="species" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="taxon" type="xs:string" minOccurs="1" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <!-- Tier 3 — Measurement target -->
+      <!-- What this assay quantifies, e.g. "cell count", "DNA strand breaks" -->
+      <xs:element name="measured-endpoint"   type="xs:string"              minOccurs="0"/>
+      <xs:element name="endpoint-direction"  type="endpoint-direction-enum" minOccurs="0"/>
+
+      <!-- Tier 4 — Ontology grounding (assay + endpoint terms) -->
+      <xs:element name="ontology-terms" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="ontology-term" type="ontology-term-type"
+                        minOccurs="1" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <!-- Tier 5 — Evidence / quality -->
+      <!--
+        Formal test guideline if applicable, e.g. "OECD TG 487", "ISO 10993-5".
+        Note: Methods2AOP Tier 5 also includes validation status, but that
+        cannot be reliably extracted from free-text AOP-Wiki descriptions.
+      -->
+      <xs:element name="guideline"   type="xs:string"    minOccurs="0"/>
+      <xs:element name="throughput"  type="throughput-enum" minOccurs="0"/>
+
+      <!-- Provenance — verbatim source span(s) the extraction is grounded in.
+           AOP-Wiki has no curated assay structure, so there is no ground truth;
+           the quoted evidence enables a judge-free faithfulness check (is the
+           span actually present in the measurement_methodology text?) and lets a
+           curator verify each machine-suggested assay against the source.
+           One or more short spans, copied verbatim (not paraphrased). -->
+      <xs:element name="evidence" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="source-text" type="xs:string"
+                        minOccurs="1" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+    </xs:sequence>
+  </xs:complexType>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       3. Top-level assay container
+       ═══════════════════════════════════════════════════════════════════════ -->
+
+  <!-- Same pattern as the guid type in aop.xsd (drop this one when merging into it) -->
+  <xs:simpleType name="guid">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Whitespace-separated list of extraction-model keys -->
+  <xs:simpleType name="model-list">
+    <xs:list itemType="xs:string"/>
+  </xs:simpleType>
+
+  <xs:element name="assays">
+    <xs:annotation>
+      <xs:documentation>
+        Collection of structured assay records. Each assay is linked to the Key Event
+        it was extracted for through ke-id (the Key Event GUID). The optional lookup
+        section maps the GUIDs to stable, human-readable ids.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <!-- Dictionary of assay techniques (e.g. "western blot"), each a top-level
+             object with a GUID id; many assays (of many Key Events) reference one. -->
+        <xs:element name="techniques" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="technique" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="name"    type="xs:string"/>
+                    <xs:element name="synonym" type="xs:string"
+                                minOccurs="0" maxOccurs="unbounded"/>
+                  </xs:sequence>
+                  <xs:attribute name="id" type="guid" use="required"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="assay" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="method" type="measurement-method-type"/>
+              <!-- Optional: the biological change this assay measures, as the
+                   (object, process, action) triple the extraction model returned for it.
+                   Each slot is an ontology-term-type (label, optional iri / ontology);
+                   an ungrounded slot, e.g. the controlled-vocabulary action, carries the
+                   label only. An empty element is not valid: leave it out instead. It
+                   sits on the assay wrapper, not in measurement-method-type. -->
+              <xs:element name="kec-triple" minOccurs="0">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="object"  type="ontology-term-type" minOccurs="0"/>
+                    <xs:element name="process" type="ontology-term-type" minOccurs="0"/>
+                    <xs:element name="action"  type="ontology-term-type" minOccurs="0"/>
+                  </xs:sequence>
+                  <xs:assert test="count(*) ge 1"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute name="id"           type="guid" use="required"/>
+            <xs:attribute name="ke-id"        type="guid" use="required"/>
+            <xs:attribute name="technique-id" type="guid"/>
+            <xs:attribute name="support"      type="xs:nonNegativeInteger"/>
+            <xs:attribute name="models"       type="model-list"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="lookup" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="key-event-reference" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="id"          type="guid"                use="required"/>
+                  <xs:attribute name="aop-wiki-id" type="xs:positiveInteger"  use="required"/>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="technique-reference" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="id"           type="guid"      use="required"/>
+                  <xs:attribute name="technique-id" type="xs:string" use="required"/>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="assay-reference" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="id"       type="guid"      use="required"/>
+                  <xs:attribute name="assay-id" type="xs:string"  use="required"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+    <xs:unique name="unique-assay-id">
+      <xs:selector xpath="a:assay"/>
+      <xs:field xpath="@id"/>
+    </xs:unique>
+    <xs:unique name="unique-technique-id">
+      <xs:selector xpath="a:techniques/a:technique"/>
+      <xs:field xpath="@id"/>
+    </xs:unique>
+    <xs:keyref name="assay-technique" refer="unique-technique-id">
+      <xs:selector xpath="a:assay"/>
+      <xs:field xpath="@technique-id"/>
+    </xs:keyref>
+    <xs:unique name="unique-technique-reference-id">
+      <xs:selector xpath="a:lookup/a:technique-reference"/>
+      <xs:field xpath="@id"/>
+    </xs:unique>
+    <xs:unique name="unique-key-event-reference-id">
+      <xs:selector xpath="a:lookup/a:key-event-reference"/>
+      <xs:field xpath="@id"/>
+    </xs:unique>
+    <xs:unique name="unique-assay-reference-id">
+      <xs:selector xpath="a:lookup/a:assay-reference"/>
+      <xs:field xpath="@id"/>
+    </xs:unique>
+    <xs:unique name="unique-assay-reference-assay-id">
+      <xs:selector xpath="a:lookup/a:assay-reference"/>
+      <xs:field xpath="@assay-id"/>
+    </xs:unique>
+  </xs:element>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       4. Modified key-event sequence (excerpt showing the addition)
+          Insert <measurement-methods> AFTER <measurement-methodology>
+          in the existing key-event complexType sequence.
+       ═══════════════════════════════════════════════════════════════════════ -->
+
+  <!--
+    BEFORE (current schema excerpt):
+    ─────────────────────────────────
+    <xs:element name="measurement-methodology" type="xs:string" minOccurs="0"/>
+
+    AFTER (proposed):
+    ──────────────────
+    Keep the existing free-text field (backward compat), add structured sibling:
+  -->
+  <xs:element name="key-event-extension-example">
+    <xs:annotation>
+      <xs:documentation>
+        This element is for documentation only — it shows the proposed extension
+        to the key-event sequence. In the actual schema, the content below should
+        be inserted inside the existing key-event complexType/sequence, after the
+        existing measurement-methodology element.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+
+        <!-- EXISTING — kept for backward compatibility -->
+        <xs:element name="measurement-methodology" type="xs:string" minOccurs="0">
+          <xs:annotation>
+            <xs:documentation>
+              Legacy free-text field. Retained for backward compatibility.
+              New content should be added to measurement-methods instead.
+            </xs:documentation>
+          </xs:annotation>
+        </xs:element>
+
+        <!-- NEW — structured per-assay Methods2AOP metadata -->
+        <xs:element name="measurement-methods" minOccurs="0" maxOccurs="1">
+          <xs:annotation>
+            <xs:documentation>
+              Structured replacement/extension for measurement-methodology.
+              Contains one method element per distinct assay described.
+              Aligned with Methods2AOP framework (Karmaus et al. 2025).
+            </xs:documentation>
+          </xs:annotation>
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="method" type="measurement-method-type"
+                          minOccurs="1" maxOccurs="unbounded">
+                <xs:annotation>
+                  <xs:documentation>
+                    One structured record per assay.
+                    Multiple method elements within one measurement-methods block
+                    represent distinct assays measured for this Key Event.
+                  </xs:documentation>
+                </xs:annotation>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       5. Example valid XML fragment
+       ═══════════════════════════════════════════════════════════════════════ -->
+
+  <!--
+  Example: KE measuring cell viability (DAPI) and oxidative stress (8OHG)
+
+  <key-event id="...">
+    <title>Increase, Cell Injury and Death</title>
+    <short-name>Cell Death</short-name>
+    <biological-organization-level>Cellular</biological-organization-level>
+    <description>...</description>
+
+    [Legacy free text retained]
+    <measurement-methodology>
+      DAPI staining is used to count nuclei (cell count as viability surrogate).
+      8-OHdG ELISA measures oxidative DNA damage.
+    </measurement-methodology>
+
+    [New structured metadata (one method per assay)]
+    <measurement-methods>
+
+      <method>
+        <assay-name>DAPI</assay-name>
+        <description>
+          DAPI (4′,6-diamidino-2-phenylindole) nuclear staining used to count
+          remaining cells as a surrogate for cell viability; decrease indicates
+          cytotoxicity.
+        </description>
+        <method-type>in_vitro</method-type>
+        <cell-types>
+          <cell-type>THP-1</cell-type>
+          <cell-type>A549</cell-type>
+        </cell-types>
+        <organ-tissues>
+          <organ-tissue>lung</organ-tissue>
+        </organ-tissues>
+        <species>
+          <taxon>human</taxon>
+        </species>
+        <measured-endpoint>cell count</measured-endpoint>
+        <endpoint-direction>decrease</endpoint-direction>
+        <ontology-terms>
+          <ontology-term>
+            <label>DAPI staining</label>
+            <iri>http://www.bioassayontology.org/bao#BAO_0000179</iri>
+            <ontology>BAO</ontology>
+          </ontology-term>
+          <ontology-term>
+            <label>cell population proliferation</label>
+            <iri>http://purl.obolibrary.org/obo/GO_0008283</iri>
+            <ontology>GO</ontology>
+          </ontology-term>
+        </ontology-terms>
+        <throughput>high</throughput>
+      </method>
+
+      <method>
+        <assay-name>8OHG</assay-name>
+        <description>
+          8-OHdG (8-hydroxy-2′-deoxyguanosine) ELISA measures oxidative DNA damage;
+          increase indicates ROS-mediated genotoxic stress.
+        </description>
+        <method-type>in_vitro</method-type>
+        <cell-types>
+          <cell-type>THP-1</cell-type>
+          <cell-type>A549</cell-type>
+        </cell-types>
+        <measured-endpoint>oxidative DNA damage</measured-endpoint>
+        <endpoint-direction>increase</endpoint-direction>
+        <ontology-terms>
+          <ontology-term>
+            <label>8-OHdG measurement</label>
+            <iri>http://purl.obolibrary.org/obo/CHMO_0002751</iri>
+            <ontology>CHMO</ontology>
+          </ontology-term>
+          <ontology-term>
+            <label>oxidative DNA damage</label>
+            <iri>http://purl.obolibrary.org/obo/GO_0006979</iri>
+            <ontology>GO</ontology>
+          </ontology-term>
+        </ontology-terms>
+        <guideline>OxiSelect 8-OHdG ELISA Kit</guideline>
+        <throughput>medium</throughput>
+      </method>
+
+    </measurement-methods>
+    ...
+  </key-event>
+  -->
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       6. Example valid top-level container document
+       ═══════════════════════════════════════════════════════════════════════ -->
+
+  <!--
+  The same DAPI assay as a standalone document. GUIDs are shortened here for
+  readability; real ones follow the guid pattern.
+
+  <assays xmlns="http://www.aopkb.org/aop-xml">
+    <techniques>
+      <technique id="aaaaaaaa-0000-0000-0000-000000000001">
+        <name>nuclear staining</name>
+        <synonym>DAPI staining</synonym>
+      </technique>
+    </techniques>
+
+    <assay id="bbbbbbbb-0000-0000-0000-000000000001"
+           ke-id="4b8c69a5-14a7-4585-9d77-9ecbe1e1f30c"
+           technique-id="aaaaaaaa-0000-0000-0000-000000000001"
+           support="3" models="model-a model-b model-c">
+      <method>
+        <assay-name>DAPI</assay-name>
+        <method-type>in_vitro</method-type>
+        <measured-endpoint>cell count</measured-endpoint>
+        <endpoint-direction>decrease</endpoint-direction>
+      </method>
+      <kec-triple>
+        <object>
+          <label>cell</label>
+          <iri>http://purl.obolibrary.org/obo/CL_0000000</iri>
+          <ontology>CL</ontology>
+        </object>
+        <process>
+          <label>cell population proliferation</label>
+          <iri>http://purl.obolibrary.org/obo/GO_0008283</iri>
+          <ontology>GO</ontology>
+        </process>
+        <action>
+          <label>decreased</label>
+        </action>
+      </kec-triple>
+    </assay>
+
+    <lookup>
+      <key-event-reference id="4b8c69a5-14a7-4585-9d77-9ecbe1e1f30c" aop-wiki-id="142"/>
+      <technique-reference id="aaaaaaaa-0000-0000-0000-000000000001" technique-id="TECH123"/>
+      <assay-reference id="bbbbbbbb-0000-0000-0000-000000000001" assay-id="ASSAY123"/>
+    </lookup>
+  </assays>
+  -->
+
+</xs:schema>

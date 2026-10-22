@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  KEC consensus: cross-model consensus Key Event Characterisation triples
+  =======================================================================
+  A separate object type, NOT part of the AOP-Wiki schema (aop.xsd is untouched): the
+  consensus is not curated knowledge, it is what a panel of extraction models agrees on
+  about a Key Event, so it carries none of the provenance / action-id requirements of
+  <biological-event>. It follows the conventions of aop.xsd and of the <assays> container
+  in methods2aop_schema_proposal.xsd: every object carries only a GUID @id, a Key Event
+  is referenced by its AOP-Wiki GUID (@ke-id), and the human-readable stable ids live in
+  a <lookup> section (<key-event-reference id="GUID" aop-wiki-id="123"/>).
+
+  Validation needs an XSD 1.1 validator (xmlschema.XMLSchema11): the schema uses xs:assert,
+  which lxml / libxml2 / xmllint cannot load (they fail on the schema itself).
+
+  Own target namespace (the frozen aop.xsd namespace is not reused), so documents of
+  the two schemas cannot be mixed up.
+
+    <kec-consensus>
+      <summary>                    panel, thresholds, support histogram
+      <terms>                      dictionary of terms (object / process / action), GUID ids
+      <key-event-result>*          per Key Event: its curated triples, each confirmed / missed
+      <consensus-triple>*          one per cluster of model triples, referencing terms by GUID
+      <lookup>                     KE GUID -> AOP-Wiki number (+ title)
+
+  A <consensus-triple> is one cluster of the cross-model comparison: a representative
+  triple (object / process / action, each a reference to a <term>), its support (how many
+  models), the models, and its <member>s - one per model triple in the cluster, each with
+  that model's own triple (provenance = the model name) and its match against the
+  curated triples of the Key Event. Curated triples are not duplicated: they stay in the
+  AOP-Wiki; a cluster points at the matched ones by their position (0-based, in the order
+  of the Key Event's biological events) and <key-event-result> lists each curated triple
+  as a reference (position + term references) with its derived status.
+
+  Derived status (computed by tasks/kec_xml.py from the matches; only clusters with
+  support >= min-support-ensemble are exported):
+    consensus-triple  confirmed = at least one member matched a curated triple
+                      novel     = it matched none
+    curated-triple    confirmed = confirmed by at least one exported cluster
+                      missed    = by none
+  Only the accepted clusters are in the document: n-clusters of the summary counts all
+  clusters of the comparison, n-accepted those exported.
+
+  Terms are keyed by (kind, ontology, identifier), or by the case-folded name when the
+  model gave no identifier, so the same term is one <term> everywhere. Slot confidences
+  (logprobs) are not exported. An action-less cluster is valid (no action-id).
+-->
+
+<xs:schema
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns="http://www.aopkb.org/kec-consensus"
+    xmlns:c="http://www.aopkb.org/kec-consensus"
+    xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning"
+    elementFormDefault="qualified"
+    vc:minVersion="1.1"
+    targetNamespace="http://www.aopkb.org/kec-consensus">
+
+  <!-- Same pattern as the guid type in aop.xsd -->
+  <xs:simpleType name="guid">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Whitespace-separated list of extraction-model keys -->
+  <xs:simpleType name="model-list">
+    <xs:list itemType="xs:string"/>
+  </xs:simpleType>
+
+  <!-- Whitespace-separated list of positions of curated triples -->
+  <xs:simpleType name="index-list">
+    <xs:list itemType="xs:nonNegativeInteger"/>
+  </xs:simpleType>
+
+  <xs:simpleType name="term-kind-enum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="object"/>
+      <xs:enumeration value="process"/>
+      <xs:enumeration value="action"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="cluster-status-enum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="confirmed"/>
+      <xs:enumeration value="novel"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="curated-status-enum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="confirmed"/>
+      <xs:enumeration value="missed"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- The three slots of a triple, each a reference to a <term>. Object and process are
+       optional, and so is the action: a model may give no action. -->
+  <xs:attributeGroup name="triple-slots">
+    <xs:attribute name="object-id"  type="guid"/>
+    <xs:attribute name="process-id" type="guid"/>
+    <xs:attribute name="action-id"  type="guid"/>
+  </xs:attributeGroup>
+
+  <xs:element name="kec-consensus">
+    <xs:annotation>
+      <xs:documentation>
+        Cross-model consensus triples of Key Events. See the file header.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+
+        <xs:element name="summary">
+          <xs:complexType>
+            <xs:sequence>
+              <!-- the model panel -->
+              <xs:element name="model" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+              <xs:element name="support-histogram" minOccurs="0">
+                <xs:complexType>
+                  <xs:sequence>
+                    <!-- number of clusters (accepted or not) with exactly this support -->
+                    <xs:element name="bin" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute name="support"  type="xs:nonNegativeInteger" use="required"/>
+                        <xs:attribute name="clusters" type="xs:nonNegativeInteger" use="required"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute name="n-models"             type="xs:nonNegativeInteger" use="required"/>
+            <!-- true when the comparison was restricted to a recommended ensemble subset -->
+            <xs:attribute name="restricted"           type="xs:boolean" use="required"/>
+            <!-- Key Events in this document -->
+            <xs:attribute name="n-kes"                type="xs:nonNegativeInteger" use="required"/>
+            <!-- all clusters of the comparison / clusters exported (support >= min-support-ensemble) -->
+            <xs:attribute name="n-clusters"           type="xs:nonNegativeInteger" use="required"/>
+            <xs:attribute name="n-accepted"           type="xs:nonNegativeInteger" use="required"/>
+            <!-- clustering floor of the comparison / acceptance threshold of this export -->
+            <xs:attribute name="min-support"          type="xs:nonNegativeInteger"/>
+            <xs:attribute name="min-support-ensemble" type="xs:nonNegativeInteger" use="required"/>
+            <!-- cosine threshold and embedding model of the clustering -->
+            <xs:attribute name="tau"                  type="xs:double"/>
+            <xs:attribute name="embedding"            type="xs:string"/>
+          </xs:complexType>
+        </xs:element>
+
+        <!-- Dictionary of terms, each a top-level object with a GUID id -->
+        <xs:element name="terms" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="term" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="name" type="xs:string"/>
+                  </xs:sequence>
+                  <xs:attribute name="id"        type="guid" use="required"/>
+                  <xs:attribute name="kind"      type="term-kind-enum" use="required"/>
+                  <!-- ontology prefix (GO, PR, ...; WIKI for AOP-Wiki action ids) -->
+                  <xs:attribute name="source"    type="xs:string"/>
+                  <!-- identifier in short form (GO_0006954) -->
+                  <xs:attribute name="source-id" type="xs:string"/>
+                  <xs:attribute name="iri"       type="xs:anyURI"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+
+        <!-- Per Key Event: its curated triples, referenced (the triple itself stays in the
+             AOP-Wiki), each with its derived status -->
+        <xs:element name="key-event-result" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="curated-triple" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="index"  type="xs:nonNegativeInteger" use="required"/>
+                  <xs:attribute name="status" type="curated-status-enum"   use="required"/>
+                  <xs:attributeGroup ref="triple-slots"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute name="ke-id"       type="guid" use="required"/>
+            <xs:attribute name="n-curated"   type="xs:nonNegativeInteger" use="required"/>
+            <!-- curated triples confirmed by an accepted cluster -->
+            <xs:attribute name="n-confirmed" type="xs:nonNegativeInteger" use="required"/>
+            <!-- accepted clusters matching no curated triple -->
+            <xs:attribute name="n-novel"     type="xs:nonNegativeInteger" use="required"/>
+          </xs:complexType>
+          <xs:unique name="unique-curated-index">
+            <xs:selector xpath="c:curated-triple"/>
+            <xs:field xpath="@index"/>
+          </xs:unique>
+        </xs:element>
+
+        <xs:element name="consensus-triple" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <!-- one per model triple of the cluster -->
+              <xs:element name="member" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <!-- provenance: the extraction model that produced this triple -->
+                  <xs:attribute name="model" type="xs:string" use="required"/>
+                  <xs:attributeGroup ref="triple-slots"/>
+                  <!-- match against the curated triples; curated-index only when matched -->
+                  <xs:attribute name="matched"       type="xs:boolean"/>
+                  <xs:attribute name="curated-index" type="xs:nonNegativeInteger"/>
+                  <xs:attribute name="method"        type="xs:string"/>
+                  <xs:attribute name="score"         type="xs:double"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute name="id"             type="guid" use="required"/>
+            <xs:attribute name="ke-id"          type="guid" use="required"/>
+            <xs:attribute name="status"         type="cluster-status-enum" use="required"/>
+            <!-- number of distinct models in the cluster, and which -->
+            <xs:attribute name="support"        type="xs:nonNegativeInteger" use="required"/>
+            <xs:attribute name="models"         type="model-list"/>
+            <!-- the representative triple -->
+            <xs:attributeGroup ref="triple-slots"/>
+            <!-- positions of the curated triples it confirms (confirmed clusters only) -->
+            <xs:attribute name="curated-indices" type="index-list"/>
+            <!-- best match tier (iri / name / embedding / judge) and its score -->
+            <xs:attribute name="method"         type="xs:string"/>
+            <xs:attribute name="score"          type="xs:double"/>
+            <xs:assert test="(@status = 'confirmed') = exists(@curated-indices)"/>
+          </xs:complexType>
+        </xs:element>
+
+        <xs:element name="lookup" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="key-event-reference" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="id"          type="guid"               use="required"/>
+                  <xs:attribute name="aop-wiki-id" type="xs:positiveInteger" use="required"/>
+                  <xs:attribute name="title"       type="xs:string"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+
+      </xs:sequence>
+    </xs:complexType>
+
+    <xs:unique name="unique-term-id">
+      <xs:selector xpath="c:terms/c:term"/>
+      <xs:field xpath="@id"/>
+    </xs:unique>
+    <xs:unique name="unique-consensus-triple-id">
+      <xs:selector xpath="c:consensus-triple"/>
+      <xs:field xpath="@id"/>
+    </xs:unique>
+    <xs:unique name="unique-key-event-result">
+      <xs:selector xpath="c:key-event-result"/>
+      <xs:field xpath="@ke-id"/>
+    </xs:unique>
+    <xs:unique name="unique-key-event-reference-id">
+      <xs:selector xpath="c:lookup/c:key-event-reference"/>
+      <xs:field xpath="@id"/>
+    </xs:unique>
+    <xs:unique name="unique-key-event-reference-number">
+      <xs:selector xpath="c:lookup/c:key-event-reference"/>
+      <xs:field xpath="@aop-wiki-id"/>
+    </xs:unique>
+
+    <!-- every slot points at a term of the dictionary ... -->
+    <xs:keyref name="object-term" refer="unique-term-id">
+      <xs:selector xpath="c:consensus-triple | c:consensus-triple/c:member | c:key-event-result/c:curated-triple"/>
+      <xs:field xpath="@object-id"/>
+    </xs:keyref>
+    <xs:keyref name="process-term" refer="unique-term-id">
+      <xs:selector xpath="c:consensus-triple | c:consensus-triple/c:member | c:key-event-result/c:curated-triple"/>
+      <xs:field xpath="@process-id"/>
+    </xs:keyref>
+    <xs:keyref name="action-term" refer="unique-term-id">
+      <xs:selector xpath="c:consensus-triple | c:consensus-triple/c:member | c:key-event-result/c:curated-triple"/>
+      <xs:field xpath="@action-id"/>
+    </xs:keyref>
+    <!-- ... and every Key Event reference resolves in the lookup -->
+    <xs:keyref name="consensus-triple-key-event" refer="unique-key-event-reference-id">
+      <xs:selector xpath="c:consensus-triple"/>
+      <xs:field xpath="@ke-id"/>
+    </xs:keyref>
+    <xs:keyref name="key-event-result-key-event" refer="unique-key-event-reference-id">
+      <xs:selector xpath="c:key-event-result"/>
+      <xs:field xpath="@ke-id"/>
+    </xs:keyref>
+  </xs:element>
+
+  <!--
+    Example (model keys are folder names such as vendor/model written with a double hyphen
+    in the pipeline; shortened here because a comment cannot contain two hyphens)
+    <kec-consensus xmlns="http://www.aopkb.org/kec-consensus">
+      <summary n-models="3" restricted="false" n-kes="1" n-clusters="2" n-accepted="1"
+               min-support="2" min-support-ensemble="2">
+        <model>model_a</model>
+        <model>model_b</model>
+        <model>model_c</model>
+        <support-histogram><bin support="1" clusters="1"/><bin support="3" clusters="1"/></support-histogram>
+      </summary>
+      <terms>
+        <term id="..." kind="process" source="GO" source-id="GO_0006954"
+              iri="http://purl.obolibrary.org/obo/GO_0006954"><name>inflammatory response</name></term>
+        <term id="..." kind="action"><name>increased</name></term>
+      </terms>
+      <key-event-result ke-id="..." n-curated="1" n-confirmed="1" n-novel="0">
+        <curated-triple index="0" status="confirmed" process-id="..." action-id="..."/>
+      </key-event-result>
+      <consensus-triple id="..." ke-id="..." status="confirmed" support="3"
+                        models="model_a model_b model_c"
+                        process-id="..." action-id="..." curated-indices="0" method="iri" score="1.0">
+        <member model="model_a" process-id="..." action-id="..."
+                matched="true" curated-index="0" method="iri" score="1.0"/>
+      </consensus-triple>
+      <lookup><key-event-reference id="..." aop-wiki-id="1868" title="Hyperinflammation"/></lookup>
+    </kec-consensus>
+  -->
+
+</xs:schema>

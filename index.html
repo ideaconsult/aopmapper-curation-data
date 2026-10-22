@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AOPMapper consensus views</title>
+<style>
+  :root { --bg:#fff; --fg:#1b1f24; --muted:#59636e; --line:#d1d9e0; --accent:#0969da; --card:#f6f8fa; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --line:#30363d; --accent:#4493f8; --card:#151b23; }
+  }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:50rem; margin:0 auto; padding:2rem 1rem 3rem; }
+  h1 { font-size:1.6rem; margin:0 0 .25rem; }
+  h2 { font-size:1.1rem; margin:2rem 0 .5rem; border-bottom:1px solid var(--line); padding-bottom:.25rem; }
+  p, li { color:var(--fg); }
+  .muted { color:var(--muted); }
+  a { color:var(--accent); }
+  ul.views { list-style:none; padding:0; margin:0; display:grid; gap:.75rem; }
+  ul.views li { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:.75rem 1rem; }
+  ul.views a.title { font-weight:600; }
+  .size { color:var(--muted); font-size:.85rem; white-space:nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>AOPMapper consensus views</h1>
+  <p class="muted">Cross-model consensus of LLM-extracted Key Event Components (KEC) and assay descriptions for AOP-Wiki.
+    Supplementary data for "From AOP-Wiki to AOPMAPPER: trust-aware AI-assisted enrichment of Adverse Outcome Pathway knowledge".
+    Archived data: <a href="https://doi.org/10.5281/zenodo.23554426">doi:10.5281/zenodo.23554426</a>.
+    The curated results are used to enrich <a href="https://aop.adma.ai">AOPMapper</a>.
+    Code that generates all of it: <a href="https://github.com/ideaconsult/aopmapper-curation">github.com/ideaconsult/aopmapper-curation</a>.</p>
+
+  <h2>What you are looking at</h2>
+  <p>Large language models read the free text of <a href="https://aopwiki.org">AOP-Wiki</a> Key Events (KEs) and extracted structured knowledge from it.
+    The outputs of several models were compared and grouped, so that what the models extracted independently ends up in one <em>cluster</em>.
+    The <em>support</em> of a cluster is the number of models that produced it - the more models agree, the more it can be trusted.</p>
+  <ul>
+    <li><strong>Key Event Components (KEC)</strong> are triples of a biological <em>object</em>, a <em>process</em> and an <em>action</em>
+      (for example a protein, a process it takes part in, and how it changes). AOP-Wiki already holds curated triples for many KEs,
+      so each cluster is compared with them: <em>confirmed</em> (the curated triple was also found by the models),
+      <em>missed</em> (a curated triple no model found) or <em>novel</em> (found by the models, absent from AOP-Wiki).</li>
+    <li><strong>Assays</strong> describe how a KE is measured. They are extracted from the free-text measurement methodology of AOP-Wiki Key Events:
+      assay name, method type, measured endpoint and its direction, throughput, ontology terms and the sentence of the source text that supports it.
+      AOP-Wiki has no field for structured assay information and no curated assays, so there is no confirmed or missed status;
+      clusters are read by support and by the quoted evidence. The records are exported in a proposed XML schema based on the
+      <a href="https://f1000research.com/articles/14-1375">Methods2AOP</a> recommendation for per-assay metadata.</li>
+  </ul>
+  <p class="muted">The <strong>pilot</strong> (116 Key Events of OECD-endorsed AOPs, AOP-Wiki release 2026-04-01) compared 72 models and was used to choose the consensus ensemble.
+    The <strong>full corpus</strong> (AOP-Wiki release 2026-07-01) was then processed with the ten selected models, which form the consensus.</p>
+
+  <h2>Key Event Components, full corpus (AOP-Wiki 2026-07-01)</h2>
+  <ul class="views">
+    <li><a class="title" href="aopwiki_20260701/KEC_ALL/crossmodel/manuscript/default/pareto_smaa/viz_consensus.html">KEC consensus view</a>
+      <div>Interactive page for all Key Events. For each KE: the curated AOP-Wiki triples (green when confirmed by a cluster of model triples, amber when missed) and the novel clusters (blue), each with its support bar and the models behind it. A panel summary and a support histogram are at the top.</div></li>
+  </ul>
+
+  <h2>Assays, full corpus (AOP-Wiki 2026-07-01)</h2>
+  <ul class="views">
+    <li><a class="title" href="aopwiki_20260701/ASSAYS/crossmodel/manuscript/viz_assay_consensus.html">Assay consensus view</a>
+      <span class="size">large page</span>
+      <div>One collapsible block per Key Event, with the strongest cross-model agreement first. Each assay cluster has a support bar and a table with one row per model: assay name, method type, endpoint, direction (with its confidence margin), throughput and the quoted evidence from the source text.</div></li>
+  </ul>
+
+  <h2>Key Event Components, pilot (AOP-Wiki 2026-04-01)</h2>
+  <ul class="views">
+    <li><a class="title" href="aopwiki_20260401/KEC116/crossmodel/manuscript/default/pareto_smaa/viz_consensus.html">KEC116 pilot consensus view</a>
+      <div>The same view for the 116-Key-Event pilot, where 72 models were compared. The models included are listed in the page's panel summary.</div></li>
+  </ul>
+
+  <h2>XML exports (download)</h2>
+  <ul class="views">
+    <li><a class="title" href="xml/kec_consensus.xml" download>kec_consensus.xml</a>
+      (<a href="xml/kec_consensus.xml">open rendered</a>)
+      <span class="size">about 12 MB</span>
+      <div>The KEC consensus (full corpus) as schema-valid XML.</div></li>
+    <li><a class="title" href="xml/assays.xml" download>assays.xml</a>
+      (<a href="xml/assays.xml">open rendered</a>)
+      <span class="size">about 9 MB</span>
+      <div>The curated assays as schema-valid XML, in the proposed assay schema.</div></li>
+  </ul>
+  <h2>Consensus data (download)</h2>
+  <ul class="views">
+    <li><a class="title" href="aopwiki_20260701/ASSAYS/crossmodel/manuscript/viz_assay_consensus.json" download>viz_assay_consensus.json</a>
+      <span class="size">about 37 MB</span>
+      <div>The assay consensus behind the assay view: clusters, per-model members and evidence. Token log-probabilities are reduced to the endpoint-direction margin.</div></li>
+  </ul>
+
+  <h2>Model panel (download)</h2>
+  <ul class="views">
+    <li><a class="title" href="models/model_panel.tsv" download>model_panel.tsv</a>
+      <div>The 72 models compared in the pilot, with the ranking criteria; the ten selected for the consensus are marked in the <em>Selected</em> column.</div></li>
+  </ul>
+
+  <h2>Schemas and stylesheets (download)</h2>
+  <ul class="views">
+    <li><a class="title" href="schemas/methods2aop_schema_proposal.xsd" download>methods2aop_schema_proposal.xsd</a>
+      <div>XSD 1.1 schema for the curated assays: a proposed extension of the AOP-Wiki XML, based on the Methods2AOP recommendation.</div></li>
+    <li><a class="title" href="schemas/kec_consensus_schema.xsd" download>kec_consensus_schema.xsd</a>
+      <div>XSD 1.1 schema for the KEC consensus.</div></li>
+    <li><a class="title" href="schemas/assays.xsl" download>assays.xsl</a> and
+      <a class="title" href="schemas/kec_consensus.xsl" download>kec_consensus.xsl</a>
+      <div>XSLT stylesheets that render the two XML files as HTML.</div></li>
+  </ul>
+  <p class="muted">Validate with an XSD 1.1 validator, for example Python <code>xmlschema</code>.</p>
+
+  <p class="muted" style="margin-top:2rem">Licence: CC BY-SA 4.0 (see <a href="LICENSE">LICENSE</a>).
+    Some pages are large and may take a moment to load.</p>
+</main>
+</body>
+</html>

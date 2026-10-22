@@ -1,0 +1,73 @@
+#	Model	Curated agreement	Curated recall	Exact-IRI grounding	Action margin	Panel agreement	P(rank 1)	Expected rank	TOPSIS	Selected
+1	BrainForge/Devstral-2-123B-Instruct-2512-NVFP4	0.242	0.517	0.090	0.723	0.985	0.194	5.15	0.614	yes
+2	nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4	0.367	0.497	0.148	0.500	0.977	0.461	6.83	0.988	yes
+3	rdtand/Gemma4-31B-IT-PrismaQuant-6bit-vllm	0.262	0.503	0.025	0.731	0.977	0.042	14.30	0.210	yes
+4	rdtand/Qwen3.6-27B-PrismaAURA-5.5bit-vllm	0.296	0.455	0.099	0.508	0.992	0.010	15.47	0.671	
+5	google/gemma-4-26B-A4B-it	0.225	0.490	0.022	0.788	0.982	0.090	15.85	0.189	yes
+6	nvidia/Mistral-Medium-3.5-128B-NVFP4	0.301	0.497	0.092	0.500	0.957	0.010	15.96	0.628	
+7	poolside/Laguna-S-2.1-NVFP4	0.265	0.483	0.042	0.672	0.948	0.006	16.51	0.304	yes
+8	Qwen/Qwen3.6-27B	0.313	0.421	0.082	0.534	0.995	0.006	16.92	0.562	yes
+9	Qwen/Qwen3.6-35B-A3B	0.313	0.455	0.071	0.532	0.996	0.006	16.93	0.491	
+10	ibm-granite/granite-4.0-h-small-FP8	0.230	0.448	0.057	0.665	0.984	0.003	17.46	0.393	yes
+11	rdtand/Gemma4-31B-IT-PrismaQuant-5.5bit-vllm	0.280	0.524	0.011	0.691	0.980	0.032	17.48	0.152	yes
+12	mistralai/Mistral-Small-4-119B-2603-NVFP4	0.195	0.552	0.059	0.639	0.937	0.008	18.15	0.407	
+13	google/gemma-4-31B-it	0.277	0.524	0.015	0.674	0.970	0.018	18.49	0.165	
+14	Qwen/Qwen3.5-35B-A3B	0.312	0.469	0.073	0.500	0.983	0.003	19.06	0.507	
+15	nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16	0.215	0.503	0.094	0.534	0.968	0.004	19.35	0.638	
+16	radm/Athene-V2-Chat-AWQ	0.200	0.524	0.060	0.604	0.966	0.003	20.33	0.419	yes
+17	ibm-granite/granite-4.0-h-small	0.231	0.483	0.043	0.624	0.966	0.001	22.60	0.309	
+18	ibm-granite/granite-4.1-30b	0.248	0.448	0.030	0.673	0.958	0.002	22.93	0.234	
+19	nvidia/NVIDIA-Nemotron-Labs-3-Puzzle-75B-A9B-NVFP4	0.309	0.462	0.055	0.500	0.987	0.002	24.14	0.391	
+20	inclusionAI/Ling-2.6-flash-int4	0.159	0.510	0.051	0.660	0.932	0.002	25.11	0.359	
+21	nvidia/Qwen3.5-122B-A10B-NVFP4	0.226	0.497	0.075	0.500	0.988	0.001	25.27	0.515	
+22	meta-models/Muse-Glimmer-30B-xhigh	0.281	0.159	0.110	0.630	0.966	0.034	25.41	0.735	
+23	rdtand/Hy3-295B-A21B-prismaquant-cb-2.9bit-vllm	0.312	0.365	0.076	0.500	0.984	0.002	26.02	0.525	
+24	rdtand/Qwen3.5-122B-A10B-PrismaQuant-4.75bit-vllm	0.225	0.552	0.062	0.500	0.961	0.004	26.14	0.431	
+25	openai/gpt-oss-120b	0.237	0.455	0.079	0.500	0.973	0.000	26.87	0.540	
+26	google/gemma-4-12B-it	0.177	0.455	0.016	0.780	0.913	0.022	27.64	0.150	
+27	kkuspa/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-MTP-NVFP4A16	0.266	0.428	0.073	0.500	0.968	0.000	27.78	0.501	
+28	rdtand/Qwen3.6-35B-A3B-PrismaQuant-4.75bit-vllm	0.255	0.462	0.057	0.511	0.986	0.000	28.37	0.398	
+29	deepreinforce-ai/Ornith-1.0-35B	0.236	0.503	0.055	0.501	0.988	0.001	28.79	0.385	
+30	rdtand/Qwen3.6-27B-PrismaQuant-Heretic-5.25bit-vllm	0.288	0.365	0.065	0.505	0.980	0.000	31.06	0.450	
+31	Qwen/Qwen3-30B-A3B-Thinking-2507	0.339	0.290	0.048	0.539	0.978	0.005	32.23	0.345	
+32	rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm	0.261	0.407	0.049	0.537	0.976	0.000	32.35	0.344	
+33	poolside/Laguna-XS.2	0.214	0.552	0.013	0.587	0.960	0.002	32.42	0.152	
+34	inclusionAI/Ling-3.0-flash-int4	0.213	0.531	0.047	0.500	0.977	0.001	32.57	0.335	
+35	RedHatAI/Qwen2.5-72B-Instruct-FP8-dynamic	0.164	0.490	0.042	0.608	0.948	0.000	33.36	0.295	
+36	Hcompany/Holo-3.1-35B-A3B	0.186	0.503	0.038	0.571	0.921	0.000	36.25	0.277	
+37	google/gemma-3-27b-it	0.168	0.421	0.011	0.710	0.946	0.001	36.47	0.123	yes
+38	nex-agi/Nex-N2-mini	0.210	0.510	0.045	0.500	0.952	0.000	36.66	0.323	
+39	nvidia/Qwen3-Next-80B-A3B-Thinking-NVFP4	0.207	0.434	0.062	0.500	0.976	0.000	36.71	0.429	
+40	rdtand/Qwen3.6-27B-PrismaQuant-5.5bit-vllm	0.270	0.393	0.043	0.500	0.983	0.000	37.65	0.307	
+41	Kwaipilot/KAT-Coder-V2.5-Dev	0.209	0.517	0.039	0.500	0.959	0.001	37.78	0.285	
+42	nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16	0.368	0.338	0.015	0.500	0.993	0.010	37.97	0.171	
+43	deepseek-v4-flash-dspark-logprob	0.290	0.365	0.038	0.500	0.960	0.000	39.71	0.281	
+44	mistralai/Mistral-Nemo-Instruct-2407	0.212	0.352	0.029	0.625	0.943	0.000	39.88	0.218	
+45	nvidia/Llama-4-Scout-17B-16E-Instruct-NVFP4	0.188	0.379	0.027	0.647	0.889	0.000	41.51	0.206	
+46	nvidia/Nemotron-Cascade-2-30B-A3B	0.333	0.097	0.071	0.500	0.978	0.010	41.59	0.487	
+47	openai/gpt-oss-20b	0.193	0.400	0.060	0.500	0.969	0.000	41.75	0.411	
+48	google/diffusiongemma-26B-A4B-it	0.221	0.497	0.009	0.534	0.974	0.000	42.06	0.133	
+49	google/gemma-3-12b-it	0.116	0.365	0.000	0.763	0.874	0.002	44.95	0.080	
+50	nvidia/Llama-3.1-Nemotron-70B-Instruct-HF	0.131	0.241	0.079	0.637	0.773	0.000	46.57	0.528	
+51	google/gemma-3-4b-it	0.170	0.386	0.006	0.699	0.783	0.000	46.84	0.102	
+52	deepreinforce-ai/Ornith-1.0-9B	0.168	0.462	0.025	0.541	0.947	0.000	46.88	0.196	
+53	deepseek-ai/DeepSeek-R1-Distill-Qwen-32B	0.192	0.476	0.025	0.500	0.943	0.000	47.34	0.200	
+54	nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4	0.242	0.421	0.016	0.500	0.963	0.000	47.38	0.156	
+55	rdtand/Mistral-Medium-3.5-128B-PrismaQuant-4.75-vllm	0.250	0.076	0.045	0.590	0.977	0.000	47.59	0.316	
+56	google/medgemma-27b-text-it	0.136	0.393	0.012	0.645	0.931	0.000	47.69	0.119	
+57	Shifusen/Mistral-Large-Instruct-2411-NVFP4	0.152	0.331	0.044	0.582	0.915	0.000	48.54	0.307	
+58	nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16	0.236	0.414	0.008	0.511	0.927	0.000	50.77	0.123	
+59	allenai/Olmo-3.1-32B-Instruct	0.130	0.317	0.023	0.658	0.868	0.000	50.91	0.169	
+60	arcee-ai/Trinity-Mini	0.269	0.172	0.032	0.546	0.905	0.000	51.89	0.237	
+61	nvidia/NVIDIA-Nemotron-Nano-9B-v2	0.142	0.290	0.024	0.595	0.944	0.000	53.96	0.175	
+62	zai-org/GLM-4.7-Flash	0.151	0.379	0.030	0.500	0.916	0.000	55.94	0.221	
+63	google/gemma-4-E2B-it	0.093	0.269	0.005	0.700	0.772	0.000	57.56	0.071	
+64	google/gemma-4-E4B-it	0.098	0.262	0.003	0.661	0.835	0.000	59.18	0.066	
+65	RedHatAI/Qwen2.5-Math-72B-Instruct-FP8-dynamic	0.205	0.262	0.027	0.500	0.832	0.000	59.83	0.200	
+66	arcee-ai/Trinity-Nano-Preview	0.105	0.324	0.025	0.500	0.777	0.000	64.03	0.179	
+67	LiquidAI/LFM2.5-8B-A1B	0.155	0.310	0.000	0.500	0.840	0.000	64.26	0.080	
+68	utter-project/EuroLLM-22B-Instruct-2512	0.091	0.331	0.004	0.500	0.806	0.000	66.14	0.076	
+69	rdtand/MiniMax-M2.7-PrismaQuant-3.20bit-vllm	0.126	0.324	0.005	0.500	0.642	0.000	66.76	0.083	
+70	rdtand/LFM2.5-8B-A1B-PrismaQuant-6.5bit-vllm	0.112	0.159	0.005	0.534	0.547	0.000	69.01	0.061	
+71	google/gemma-3-1b-it	0.040	0.048	0.000	0.500	0.360	0.000	70.94	0.020	
+72	sahilchachra/Leanstral-1.5-119B-A6B-NVFP4	0.000	0.000	0.000	0.534	0.000	0.000	71.73	0.001	

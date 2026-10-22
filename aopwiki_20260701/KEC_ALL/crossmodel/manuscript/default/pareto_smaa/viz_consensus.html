@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consensus triples</title>
+<style>
+* { box-sizing: border-box; font-family: system-ui, sans-serif; font-size: 13px; }
+body { margin: 16px; color: #222; }
+h1 { font-size: 18px; margin-bottom: 4px; }
+.info { font-size: 12px; color: #555; margin-bottom: 8px; }
+.hist { margin-bottom: 16px; }
+details { margin-bottom: 6px; border: 1px solid #ddd; border-radius: 4px; }
+details > summary {
+    cursor: pointer; padding: 6px 10px; background: #f5f5f5;
+    font-weight: 600; list-style: none;
+    display: flex; gap: 8px; align-items: center;
+}
+details > summary::-webkit-details-marker { display: none; }
+.ke-table { width: 100%; border-collapse: collapse; }
+.ke-table th {
+    background: #eceff1; font-size: 11px; padding: 3px 6px;
+    text-align: left; border-bottom: 2px solid #cfd8dc;
+}
+.ke-table td { padding: 3px 6px; vertical-align: top; border-bottom: 1px solid #f0f0f0; }
+.gt-row    { background: #f1f8e9; }
+.miss-row  { background: #fff8e1; }
+.novel-row { background: #e3f2fd; }
+.slot-name { font-weight: 500; }
+.slot-iri  { font-size: 10px; color: #666; display: block; }
+.logprob   { font-size: 11px; color: #888; display: block; }
+.tier { display: inline-block; font-size: 10px; font-weight: 700;
+        padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
+.sep { color: #bbb; padding: 0 2px; }
+</style>
+</head>
+<body>
+<div id="app">Loading…</div>
+<script>
+const DATA_FILE = "viz_consensus.json";
+
+function e(s){ if(s==null) return ''; return String(s).replace(/[&<>"]/g,
+  c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function lab(k){ return (k && k.indexOf('--')>=0) ? k.split('--').slice(1).join('--') : (k||''); }
+const TIER={iri:['#1b5e20','#e8f5e9'],name:['#4e342e','#efebe9'],
+  embedding:['#0d47a1','#e3f2fd'],judge:['#6a1b9a','#f3e5f5'],
+  none:['#b71c1c','#ffebee'],absent:['#888','#fafafa']};
+function tierBadge(t){ const c=TIER[t]||['#333','#eee'];
+  return `<span class="tier" style="color:${c[0]};background:${c[1]}">${e(t)}</span>`; }
+function slot(s, withLp){
+  if(!s || !s.name) return '<span style="color:#bbb">—</span>';
+  let iriShort = s.iri ? s.iri.split('/').pop().replace(/_/g,':') : '';
+  if(iriShort.indexOf(':')<0 && s.source) iriShort = iriShort ? (s.source+':'+iriShort) : s.source;
+  let out = `<span class="slot-name">${e(s.name)}</span>`;
+  if(iriShort) out += `<span class="slot-iri">${e(iriShort)}</span>`;
+  if(withLp && s.lp!=null){ const bar=Math.min(Math.max(Math.round((s.lp+5)/5*10),0),10);
+    out += `<span class="logprob">lp=${s.lp.toFixed(3)} ${'█'.repeat(bar)}${'░'.repeat(10-bar)}</span>`; }
+  return out;
+}
+let MIN_SUPPORT_ENSEMBLE=1;   // set from data.summary in render(); the publish accept/drop gate
+function supportBar(support,n){
+  // Color reflects the publish acceptance threshold
+  // (support < min_support_ensemble -> dropped), not a fraction-of-panel heatmap — with a
+  // small model panel, a real indexable cluster can have a low support/n ratio.
+  const accepted = support>=MIN_SUPPORT_ENSEMBLE;
+  const color = accepted?'#2e7d32':'#b71c1c';
+  const frac=support/Math.max(n,1);
+  const pct=Math.round(frac*100);
+  const bar=`<span style="display:inline-block;width:70px;height:9px;background:#eee;border-radius:3px;vertical-align:middle"><span style="display:block;width:${pct}%;height:100%;background:${color};border-radius:3px"></span></span>`;
+  const tag = accepted?'':' ✗ below min_support_ensemble';
+  return `<span style="color:${color};font-weight:700" title="min_support_ensemble=${MIN_SUPPORT_ENSEMBLE}">${support}/${n}${tag}</span> ${bar}`;
+}
+function memberTable(members){
+  const rows = members.map(m=>{
+    const v=m.match; const tier=v?(v.method||'none'):'—';
+    const score=(v&&v.score!=null)?v.score.toFixed(3):'';
+    return `<tr>
+      <td style="font-size:11px;color:#555;white-space:nowrap">${e(lab(m.model))}</td>
+      <td>${slot(m.slots.object,true)}</td>
+      <td>${slot(m.slots.process,true)}</td>
+      <td>${slot(m.slots.action,true)}</td>
+      <td style="font-size:11px">${tier!=='—'?tierBadge(tier):''} ${score}</td>
+    </tr>`;
+  }).join('');
+  return `<table style="width:100%;border-collapse:collapse;margin-top:4px">
+    <thead><tr style="background:#f5f5f5">
+    <th style="font-size:11px;padding:2px 6px">model</th>
+    <th style="font-size:11px;padding:2px 6px">object</th>
+    <th style="font-size:11px;padding:2px 6px">process</th>
+    <th style="font-size:11px;padding:2px 6px">action</th>
+    <th style="font-size:11px;padding:2px 6px">GT match</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+function clusterSummary(c,n,label,border){
+  let bestTier='none', bestScore=null;
+  for(const mem of c.members){ const v=mem.match;
+    if(v && v.matched){ const t=v.method; if(bestTier==='none'||t==='iri'){bestTier=t;bestScore=v.score;} } }
+  const modelLabels=c.models.map(lab).join(', ');
+  const scoreS=bestScore!=null?` score=${bestScore.toFixed(3)}`:'';
+  return `<details style="border-left:4px solid ${border};margin:4px 0;padding-left:6px">
+    <summary style="cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center;padding:3px 0;background:transparent;border:none;font-weight:normal">
+      <span style="font-size:11px;color:#555">${e(label)}</span>
+      ${supportBar(c.support,n)}
+      <span style="font-size:11px;color:#888">${e(modelLabels)}</span>
+      ${bestTier!=='none'?tierBadge(bestTier):''}
+      <span style="font-size:11px;color:#888">${scoreS}</span>
+    </summary>
+    <table style="width:100%;border-collapse:collapse;margin:4px 0 2px 0">
+    <thead><tr style="background:#eceff1">
+    <th style="font-size:11px;padding:2px 6px">object (repr.)</th>
+    <th style="font-size:11px;padding:2px 6px">process (repr.)</th>
+    <th style="font-size:11px;padding:2px 6px">action</th>
+    </tr></thead><tbody><tr>
+    <td style="padding:2px 6px">${slot(c.rep.object,false)}</td>
+    <td style="padding:2px 6px">${slot(c.rep.process,false)}</td>
+    <td style="padding:2px 6px">${slot(c.rep.action,false)}</td>
+    </tr></tbody></table>
+    <details style="margin-left:8px">
+    <summary style="font-size:11px;color:#888;cursor:pointer;list-style:none">${c.members.length} member triple(s) with logprobs ▸</summary>
+    ${memberTable(c.members)}
+    </details></details>`;
+}
+function keBlock(ke,n){
+  const clusters=ke.clusters, gt=ke.gt;
+  const clusterToGt={};
+  clusters.forEach((c,ci)=>{ for(const mem of c.members){ const v=mem.match;
+    if(v&&v.matched&&v.ref_idx!=null){ (clusterToGt[ci]=clusterToGt[ci]||new Set()).add(v.ref_idx); } } });
+  const gtToClusters={};
+  Object.keys(clusterToGt).forEach(ci=>{ clusterToGt[ci].forEach(ref=>{ (gtToClusters[ref]=gtToClusters[ref]||[]).push(+ci); }); });
+  const novelIdxs=clusters.map((_,ci)=>ci).filter(ci=>!(ci in clusterToGt));
+  const nGtConfirmed=Object.keys(gtToClusters).length;
+  const nNovel=novelIdxs.length, nClusters=clusters.length;
+  const badge = nGtConfirmed?'#2e7d32':(gt.length?'#c62828':'#555');
+  let rows=[];
+  gt.forEach((g,gi)=>{
+    const gtCell=`<td style="padding:3px 6px">${slot(g.object,false)}</td><td style="padding:3px 6px">${slot(g.process,false)}</td><td style="padding:3px 6px">${slot(g.action,false)}</td>`;
+    const confirming=gtToClusters[gi]||[];
+    if(confirming.length){
+      const sorted=confirming.slice().sort((a,b)=>clusters[b].support-clusters[a].support);
+      const blocks=sorted.map(ci=>clusterSummary(clusters[ci],n,'confirmed by','#2e7d32')).join('');
+      rows.push(`<tr class="gt-row"><td style="padding:3px 6px;font-size:11px;color:#888">GT #${gi}</td>${gtCell}<td style="padding:3px 6px"><span style="color:#2e7d32;font-size:11px">✓ confirmed (${confirming.length} cluster(s))</span>${blocks}</td></tr>`);
+    } else {
+      rows.push(`<tr class="miss-row"><td style="padding:3px 6px;font-size:11px;color:#888">GT #${gi}</td>${gtCell}<td style="padding:3px 6px"><span style="color:#b71c1c;font-size:11px">✗ not found by any model</span></td></tr>`);
+    }
+  });
+  const novelSorted=novelIdxs.slice().sort((a,b)=>clusters[b].support-clusters[a].support);
+  if(novelSorted.length){
+    const blocks=novelSorted.map(ci=>clusterSummary(clusters[ci],n,'novel','#1565c0')).join('');
+    rows.push(`<tr class="novel-row"><td style="padding:3px 6px;font-size:11px;color:#1565c0;font-style:italic" colspan="4">novel (no GT match) — ${nNovel} cluster(s)</td><td style="padding:3px 6px">${blocks}</td></tr>`);
+  }
+  if(!gt.length && !novelSorted.length) return '';
+  let table;
+  if(!gt.length){
+    const blocks=clusters.slice().sort((a,b)=>b.support-a.support).map(c=>clusterSummary(c,n,'(no GT)','#1565c0')).join('');
+    table=`<div>${blocks}</div>`;
+  } else {
+    table=`<table class="ke-table"><thead><tr><th style="width:50px">GT #</th><th>GT object</th><th>GT process</th><th>GT action</th><th>consensus</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+  }
+  return `<details><summary><a href="https://aop.adma.ai/?fieldId=${encodeURIComponent(ke.ke_id)}" target="_blank" rel="noopener" style="font-family:monospace;color:inherit;text-decoration:none;border-bottom:1px dotted" onclick="event.stopPropagation()">${e(ke.ke_id)}</a><span class="sep">|</span><span style="font-weight:400;color:#444">${e((ke.title||'').slice(0,120))}</span><span class="sep">|</span><span style="color:${badge};font-size:12px">${nGtConfirmed}/${gt.length} GT confirmed</span><span style="color:#1565c0;font-size:12px">${nNovel} novel</span><span style="color:#888;font-size:12px">${nClusters} clusters</span></summary>${table}</details>`;
+}
+function render(data,root){
+  const s=data.summary;
+  const scope=s.restricted?`recommended ensemble subset — ${s.n_models} models`:`${s.n_models} models`;
+  const minSup=s.min_support==null?2:s.min_support;
+  MIN_SUPPORT_ENSEMBLE = s.min_support_ensemble==null?1:s.min_support_ensemble;
+  // n_consensus is the will-be-indexed count (support >= min_support_ensemble), matching the
+  // bar colors below; minSup (clustering floor) is reported separately as context only.
+  const info=`${scope} | ${s.n_clusters} clusters total, ${s.n_consensus} to be indexed (support≥${MIN_SUPPORT_ENSEMBLE}) | clustered at support≥${minSup} | τ=${s.tau==null?'—':s.tau} | ${s.embedding||'—'}`;
+  // Tint buckets by the same gate: green = these clusters get indexed, grey = dropped.
+  const hist=Object.entries(s.support_histogram||{}).sort((a,b)=>(+a[0])-(+b[0]))
+    .map(kv=>{ const acc=(+kv[0])>=MIN_SUPPORT_ENSEMBLE;
+      const bg=acc?'#e8f5e9':'#f0f0f0', fg=acc?'#2e7d32':'#888';
+      return `<span style="background:${bg};color:${fg};padding:1px 5px;border-radius:3px;font-size:11px" title="${acc?'indexed':'dropped'} (min_support_ensemble=${MIN_SUPPORT_ENSEMBLE})">sup=${kv[0]}: ${kv[1]}</span>`;
+    }).join(' ');
+  const models=s.models||[];
+  const chips=models.map((m,i)=>`<span style="background:#eceff1;padding:1px 6px;border-radius:3px;font-size:11px;display:inline-block;margin:1px" title="${e(m)}">${i+1}. ${e(lab(m))}</span>`).join(' ');
+  const modelList=`<details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:12px;color:#555;list-style:none">${s.restricted?'Recommended ensemble':'Model panel'} — ${models.length} models ▸</summary><div style="margin-top:6px">${chips}</div></details>`;
+  const blocks=data.kes.map(ke=>keBlock(ke,s.n_models)).filter(Boolean).join('');
+  const title='Cross-model consensus triples'+(s.restricted?' (recommended subset)':'');
+  document.title = 'Consensus triples'+(s.restricted?' (subset)':'')+' — ' + (data.products||'');
+  root.innerHTML=`<h1>${title} — ${e(data.products)}</h1><p class="info">${e(info)}</p>${modelList}<p class="hist">Support distribution: ${hist}</p>${blocks}`;
+}
+
+fetch(DATA_FILE)
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  .then(data => render(data, document.getElementById('app')))
+  .catch(err => {
+    document.getElementById('app').innerHTML =
+      '<p style="color:#b71c1c;font-family:system-ui,sans-serif">Could not load <code>'
+      + DATA_FILE + '</code>: ' + err + '<br>This page must be <b>served over http</b> '
+      + '(e.g. <code>python -m http.server</code> in this folder), not opened as a file.</p>';
+  });
+</script>
+</body>
+</html>
