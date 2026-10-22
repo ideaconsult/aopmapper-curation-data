@@ -1,4 +1,4 @@
-# AOPMapper supplementary data
+# AOP-Wiki Key Event Components and assays: LLM extraction, cross-model consensus
 
 LLM-extracted Key Event Components and assay descriptions for AOP-Wiki, with cross-model consensus and schema-valid XML exports.
 
